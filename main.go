@@ -166,6 +166,6 @@ func main() {
 		add(&s, assignment)
 	}
 	
-	b, _ := json.Marshal(s)
+	b, _ := json.MarshalIndent(s, "", "\t")
 	fmt.Printf("%s\n", b)
 }
