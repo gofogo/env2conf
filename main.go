@@ -153,7 +153,7 @@ func main() {
 	if len(os.Args) == 2 {
 		for _, assignment := range os.Environ() {
 			prefix := os.Args[1]
-			if assignment[:len(prefix)] == prefix {
+			if len(assignment) > len(prefix) && assignment[:len(prefix)] == prefix {
 				assignments = append(assignments, assignment[len(prefix):])
 			}
 		}
