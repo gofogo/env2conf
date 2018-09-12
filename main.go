@@ -171,8 +171,10 @@ func main() {
 	for _, assignment := range assignments {
 		// exclude _= from the special underscores processing, as it is common and breaks things
 		if useUnderscores && !strings.HasPrefix(assignment, "_=") {
-			assignment = strings.Replace(assignment, "_", ".", -1)
-			assignment = strings.Replace(assignment, "..", "_", -1)
+			kv := strings.SplitN(assignment, "=", 2)
+			key := strings.Replace(kv[0], "_", ".", -1)
+			key = strings.Replace(key, "..", "_", -1)
+			assignment = key + "=" + kv[1]
 		}
 		add(&s, assignment)
 	}
