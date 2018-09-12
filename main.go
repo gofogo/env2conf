@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"regexp"
 	"os"
+	"flag"
 )
 
 type jsonStructure interface{}
@@ -147,13 +148,18 @@ func add(s *jsonStructure, assignment string) {
 }
 
 func main() {
+	// parse command line options
+	var useUnderscores bool;
+	flag.BoolVar(&useUnderscores, "underscores", false, "Use _ as a field seperator. Use __ (two underscores) for a literal _")
+	flag.Parse()
+	
 	var s jsonStructure
 	
 	var assignments []string
-	if len(os.Args) == 2 {
+	if flag.NArg() == 1 {
 		for _, assignment := range os.Environ() {
-			prefix := os.Args[1]
-			if len(assignment) > len(prefix) && assignment[:len(prefix)] == prefix {
+			prefix := flag.Arg(0)
+			if strings.HasPrefix(assignment, prefix) {
 				assignments = append(assignments, assignment[len(prefix):])
 			}
 		}
@@ -163,6 +169,11 @@ func main() {
 	}
 	
 	for _, assignment := range assignments {
+		// exclude _= from the special underscores processing, as it is common and breaks things
+		if useUnderscores && !strings.HasPrefix(assignment, "_=") {
+			assignment = strings.Replace(assignment, "_", ".", -1)
+			assignment = strings.Replace(assignment, "..", "_", -1)
+		}
 		add(&s, assignment)
 	}
 	
