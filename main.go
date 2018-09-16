@@ -15,11 +15,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type jsonStructure interface{}
-type jsonPath []interface{}
+type complexStructure interface{}
+type complexPath []interface{}
 
 // add a single kv pair to a complex data structure
-func addToComplex(s *jsonStructure, path jsonPath, value interface{}) {
+func addToComplex(s *complexStructure, path complexPath, value interface{}) {
 	if len(path) == 0 {
 		// base case
 		*s = value
@@ -29,14 +29,14 @@ func addToComplex(s *jsonStructure, path jsonPath, value interface{}) {
 				// array append case
 				
 				if *s == nil {
-					*s = make([]jsonStructure, 0, 1)
+					*s = make([]complexStructure, 0, 1)
 				}
 				
 				switch sSlice := (*s).(type) {
-					case []jsonStructure:
-						var newElement jsonStructure
+					case []complexStructure:
+						var newElement complexStructure
 						addToComplex(&newElement, path[1:], value)
-						*s = append((*s).([]jsonStructure), newElement)
+						*s = append((*s).([]complexStructure), newElement)
 					default:
 						panic(fmt.Sprintf("s is %t, not slice\n", sSlice))
 				}
@@ -44,11 +44,11 @@ func addToComplex(s *jsonStructure, path jsonPath, value interface{}) {
 				// array with index case
 				
 				if *s == nil {
-					*s = make([]jsonStructure, 0, pathComponent+1)
+					*s = make([]complexStructure, 0, pathComponent+1)
 				}
 				
 				switch sSlice := (*s).(type) {
-					case []jsonStructure:
+					case []complexStructure:
 						for len(sSlice) <= pathComponent {
 							sSlice = append(sSlice, nil)
 							*s = sSlice
@@ -63,11 +63,11 @@ func addToComplex(s *jsonStructure, path jsonPath, value interface{}) {
 				// map case
 				
 				if *s == nil {
-					*s = make(map[string]jsonStructure)
+					*s = make(map[string]complexStructure)
 				}
 				
 				switch sMap := (*s).(type) {
-					case map[string]jsonStructure:
+					case map[string]complexStructure:
 						if elem, exists := sMap[pathComponent]; !exists {
 							sMap[pathComponent] = elem
 						}
@@ -122,7 +122,7 @@ func guessType(val string, emptyNil bool) (ret interface{}) {
 
 // BUG(jon): splitPath() can break silently if an identifier contains special chars
 // ex: foo.bar["weird[identifier]"].baz
-func splitPath(pathStr string) (path []interface{}) {
+func splitPath(pathStr string) (path complexPath) {
 	tokenRegex := regexp.MustCompile(`(?:^|\.)(?:([^[\].]+)((?:\[[^[\].]*\])*)|)`)
 	indexRegex := regexp.MustCompile(`\[([^[\]]*)\]`)
 	matches := tokenRegex.FindAllStringSubmatch(pathStr, -1)
@@ -141,7 +141,7 @@ func splitPath(pathStr string) (path []interface{}) {
 	return
 }
 
-func add(s *jsonStructure, assignment string) {
+func add(s *complexStructure, assignment string) {
 	kv := strings.SplitN(assignment, "=", 2)
 	path := splitPath(kv[0])
 	value := guessType(kv[1], false)
@@ -221,7 +221,7 @@ func main() {
 	flag.Parse()
 	outputFormat = strings.ToLower(outputFormat);
 	
-	var s jsonStructure
+	var s complexStructure
 	
 	var assignments []string
 	if flag.NArg() == 1 {
