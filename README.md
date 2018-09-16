@@ -1,5 +1,5 @@
-# Usage
-`env2conf`: prints the environment as json
+## Usage
+`env2conf`: prints the environment as json, xml, toml, or yaml
 
 `env2conf prefix_`: exclude environment variables that don't start with "prefix_"
 
@@ -36,4 +36,16 @@ env - \
     ]
   ]
 }
+```
+
+## Options
+```
+  --fmt string
+        Output format. Can be json, xml, toml, yaml (default "json")
+  --pid int
+        Read environment from given PID (defaults to self). This can be usefull if your shell strips environment variables containing special charicters.
+  --root string
+        Root tag to be used when generating XML (default "config")
+  --underscores
+        Use _ as a field seperator. Use __ (two underscores) for a literal _
 ```

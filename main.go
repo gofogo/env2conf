@@ -2,12 +2,17 @@ package main
 
 import (
 	"fmt"
-	"encoding/json"
 	"strings"
 	"strconv"
 	"regexp"
 	"os"
 	"flag"
+	"bufio"
+	
+	"encoding/json"
+	"github.com/clbanning/mxj"
+	"github.com/naoina/toml"
+	"gopkg.in/yaml.v2"
 )
 
 type jsonStructure interface{}
@@ -136,10 +141,6 @@ func splitPath(pathStr string) (path []interface{}) {
 	return
 }
 
-// BUG(jon): add() can break silently if the path contains an '='.
-// this bug does not affect the value.
-// broken: foo.bar["="]="baz"
-// ok:     foo.bar="fiz=buz"
 func add(s *jsonStructure, assignment string) {
 	kv := strings.SplitN(assignment, "=", 2)
 	path := splitPath(kv[0])
@@ -147,17 +148,84 @@ func add(s *jsonStructure, assignment string) {
 	addToComplex(s, path, value)
 }
 
+func environ(pid int) (assignments []string) {
+	if pid <= 0 {
+		return os.Environ()
+	}
+	
+	fileName := fmt.Sprintf("/proc/%d/environ", pid)
+	file, err := os.Open(fileName)
+	if err != nil {
+		panic("Could not load environment for PID " + strconv.Itoa(pid) + "\n" +
+		      "Failed to open " + fileName + ": " + err.Error())
+	}
+	
+	reader := bufio.NewReader(file)
+	// read null delineated file
+	for {
+		assignment, err := reader.ReadString('\x00')
+		if err != nil {
+			// break on EOF
+			break
+		}
+		
+		// remove null byte from end
+		assignment = assignment[:len(assignment)-1]
+		
+		assignments = append(assignments, assignment)
+	}
+	return
+}
+
+func encode(obj interface{}, format string, xmlRootTag string) (string) {
+	switch(format) {
+		case "json":
+			bytes, err := json.MarshalIndent(obj, "", "\t")
+			if err != nil {
+				panic(err)
+			}
+			return string(bytes)
+		case "xml":
+			bytes, err := mxj.AnyXmlIndent(obj, "", "\t", xmlRootTag)
+			if err != nil {
+				panic(err)
+			}
+			return string(bytes)
+		case "toml":
+			bytes, err := toml.Marshal(obj)
+			if err != nil {
+				panic(err)
+			}
+			return string(bytes)
+		case "yaml":
+			bytes, err := yaml.Marshal(obj)
+			if err != nil {
+				panic(err)
+			}
+			return string(bytes)
+		default:
+			panic("Format " + format + " is unsupported")
+	}
+}
+
 func main() {
 	// parse command line options
 	var useUnderscores bool;
 	flag.BoolVar(&useUnderscores, "underscores", false, "Use _ as a field seperator. Use __ (two underscores) for a literal _")
+	var pid int;
+	flag.IntVar(&pid, "pid", 0, "Read environment from given PID (defaults to self). This can be usefull if your shell strips environment variables containing special charicters.")
+	var outputFormat string;
+	flag.StringVar(&outputFormat, "fmt", "json", "Output format. Can be json, xml, toml, yaml")
+	var xmlRootTag string;
+	flag.StringVar(&xmlRootTag, "root", "config", "Root tag to be used when generating XML")
 	flag.Parse()
+	outputFormat = strings.ToLower(outputFormat);
 	
 	var s jsonStructure
 	
 	var assignments []string
 	if flag.NArg() == 1 {
-		for _, assignment := range os.Environ() {
+		for _, assignment := range environ(pid) {
 			prefix := flag.Arg(0)
 			if strings.HasPrefix(assignment, prefix) {
 				assignments = append(assignments, assignment[len(prefix):])
@@ -165,13 +233,15 @@ func main() {
 		}
 	} else {
 		// no prefix
-		assignments = os.Environ()
+		assignments = environ(pid)
 	}
 	
 	for _, assignment := range assignments {
 		// exclude _= from the special underscores processing, as it is common and breaks things
 		if useUnderscores && !strings.HasPrefix(assignment, "_=") {
 			kv := strings.SplitN(assignment, "=", 2)
+			// BUG(jon): there are no rules about how to parse 3 consecutive underscores
+			// BUG(jon): Ideally we would not recognise the dot when in --underscores mode
 			key := strings.Replace(kv[0], "_", ".", -1)
 			key = strings.Replace(key, "..", "_", -1)
 			assignment = key + "=" + kv[1]
@@ -179,6 +249,7 @@ func main() {
 		add(&s, assignment)
 	}
 	
-	b, _ := json.MarshalIndent(s, "", "\t")
-	fmt.Printf("%s\n", b)
+	// encode and print
+	output := encode(s, outputFormat, xmlRootTag)
+	fmt.Printf("%s\n", output)
 }
